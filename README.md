@@ -1,10 +1,18 @@
 # Jelly Surprise 2026
 
-A fun, colorful match-3 puzzle game built with Phaser 3, TypeScript, and Vite.
+A mystery evolution game where creatures evolve by collecting magical essences, built with Phaser 3, TypeScript, and Vite.
 
 ## Game Vision
 
-Jelly Surprise is a vibrant match-3 puzzle game where players swap colorful jellies to make matches and score points. The game features smooth animations, satisfying sound effects, and progressively challenging levels.
+Jelly Surprise is a mystery evolution game where players guide colorful creatures that evolve by collecting magical essences. Discover new creature forms through evolution, browse the creature catalog, and save your progress locally.
+
+## Features
+
+- **Mystery Evolution System**: Collect essences to evolve your creature through multiple tiers
+- **Creature Catalog**: View all discovered creatures and their evolution stages
+- **Save/Load System**: Progress automatically saved to localStorage
+- **Smooth Controls**: WASD or Arrow key movement
+- **Visual Feedback**: Floating text, animations, and evolution celebrations
 
 ## Tech Stack
 
