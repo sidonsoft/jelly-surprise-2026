@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ELEMENTS, ELEMENT_COLORS, ELEMENT_EMOJI, CREATURES } from './constants';
 import type { Element } from './constants';
-import { saveGame, loadGame as loadGameFromStorage } from './systems/SaveSystem';
+import { saveGame, loadGame as loadGameFromStorage, clearSave } from './systems/SaveSystem';
 import { showSaveIndicator, showLoadToast } from './ui/SaveIndicator';
 
 const CANVAS_WIDTH = 800;
@@ -120,6 +120,41 @@ export class JellyGame extends Phaser.Scene {
       modalOverlay.classList.remove('show');
       gameState.isEvolving = false;
     });
+
+    const resetBtn = document.getElementById('reset-btn')!;
+    const confirmDialog = document.getElementById('confirm-dialog')!;
+    const confirmYes = document.getElementById('confirm-yes')!;
+    const confirmNo = document.getElementById('confirm-no')!;
+
+    resetBtn.addEventListener('click', () => {
+      confirmDialog.classList.add('show');
+    });
+
+    confirmYes.addEventListener('click', () => {
+      confirmDialog.classList.remove('show');
+      this.resetGame();
+    });
+
+    confirmNo.addEventListener('click', () => {
+      confirmDialog.classList.remove('show');
+    });
+  }
+
+  resetGame() {
+    clearSave();
+    gameState.player = { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    gameState.evolutionPoints = 0;
+    gameState.collectedEssence = {};
+    gameState.discoveredCreatures = [];
+    gameState.currentCreature = null;
+    gameState.isEvolving = false;
+
+    playerGraphics.clear();
+    this.drawGlowCircle(playerGraphics, gameState.player.x, gameState.player.y, PLAYER_SIZE, 0xe94560, true);
+    playerEmoji.setText('🫧');
+
+    this.updateUI();
+    showSaveIndicator();
   }
 
   spawnOrbs() {
