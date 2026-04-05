@@ -3,39 +3,141 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jelly Surprise 2026</title>
+  <title>Jelly Surprise</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: #0a0a1a; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      color: #fff;
     }
-    
-    body {
-      background: #1a1a2e;
+    #game-container {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(233, 69, 96, 0.3);
+    }
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 15px 20px;
       display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .ui-left, .ui-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .creature-display {
+      font-size: 28px;
+      text-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    .essence-counter {
+      background: rgba(0,0,0,0.4);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+    }
+    #evolution-bar-container {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 24px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 12px;
+      padding: 4px;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    #evolution-bar-fill {
+      height: 100%;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #e94560, #ff6b6b);
+      transition: width 0.3s ease;
+      box-shadow: 0 0 15px rgba(233, 69, 96, 0.6);
+    }
+    #evolution-text {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      text-shadow: 0 0 5px rgba(0,0,0,0.8);
+    }
+    #modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 100;
     }
-    
-    #game-container {
-      border: 3px solid #4a4a6a;
-      border-radius: 10px;
-      box-shadow: 0 0 30px rgba(100, 100, 200, 0.3);
-    }
-    
-    .loading {
+    #modal-overlay.show { display: flex; }
+    #modal-emoji { font-size: 80px; }
+    #modal-title {
+      font-size: 28px;
+      font-weight: bold;
       color: #fff;
-      text-align: center;
-      padding: 20px;
+      text-shadow: 0 0 20px currentColor;
+    }
+    #modal-subtitle { color: #aaa; font-size: 16px; }
+    #modal-button {
+      margin-top: 20px;
+      padding: 12px 40px;
+      font-size: 18px;
+      background: linear-gradient(135deg, #e94560, #ff6b6b);
+      border: none;
+      border-radius: 30px;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #modal-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(233, 69, 96, 0.6);
     }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <div class="loading">🫧 Loading Jelly Surprise...</div>
+    <div id="ui-overlay">
+      <div class="ui-left">
+        <span class="creature-display" id="creature-emoji">🫧</span>
+        <span id="creature-name">Baby Jelly</span>
+      </div>
+      <div class="ui-right">
+        <span class="essence-counter" id="essence-counter">Essence: 0</span>
+        <span class="essence-counter" id="creature-count">Found: 0/5</span>
+      </div>
+    </div>
+    <div id="evolution-bar-container">
+      <div id="evolution-bar-fill" style="width: 0%"></div>
+    </div>
+    <div id="evolution-text">0 / 10 Essence</div>
+    <div id="modal-overlay">
+      <div id="modal-emoji">🔥</div>
+      <div id="modal-title">You became a FIRE JELLY!</div>
+      <div id="modal-subtitle">A new creature has awakened</div>
+      <button id="modal-button">Continue</button>
+    </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
