@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ELEMENTS, ELEMENT_COLORS, ELEMENT_EMOJI, CREATURES } from './constants';
 import type { Element } from './constants';
+import { initAudio, playEssenceCollect, playEvolution, playUIClick, playMenuOpen, playMenuClose, toggleMute, getMuted, startBGM } from './audio';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
@@ -44,12 +45,15 @@ export class JellyGame extends Phaser.Scene {
   }
 
   create() {
+    initAudio();
+    startBGM();
     this.createGrid();
     this.createPlayer();
     this.spawnOrbs();
     this.setupControls();
     this.setupUI();
     this.loadGame();
+    window.dispatchEvent(new CustomEvent('game-ready'));
   }
 
   createGrid() {
@@ -103,9 +107,19 @@ export class JellyGame extends Phaser.Scene {
   setupUI() {
     const modalOverlay = document.getElementById('modal-overlay')!;
     const modalButton = document.getElementById('modal-button')!;
+    const muteButton = document.getElementById('mute-button')!;
+
     modalButton.addEventListener('click', () => {
+      playUIClick();
+      playMenuClose();
       modalOverlay.classList.remove('show');
       gameState.isEvolving = false;
+    });
+
+    muteButton.addEventListener('click', () => {
+      playUIClick();
+      const muted = toggleMute();
+      muteButton.textContent = muted ? '🔇' : '🔊';
     });
   }
 
@@ -229,7 +243,10 @@ export class JellyGame extends Phaser.Scene {
     this.updateUI();
 
     if (gameState.evolutionPoints >= EVOLUTION_MAX) {
+      playEvolution();
       this.triggerEvolution();
+    } else {
+      playEssenceCollect();
     }
 
     this.saveGame();
@@ -252,6 +269,8 @@ export class JellyGame extends Phaser.Scene {
     const modalEmoji = document.getElementById('modal-emoji')!;
     const modalTitle = document.getElementById('modal-title')!;
     const modalSubtitle = document.getElementById('modal-subtitle')!;
+
+    playMenuOpen();
 
     modalEmoji.textContent = ELEMENT_EMOJI[randomCreature.element];
     modalTitle.textContent = `You became a ${randomCreature.element.toUpperCase()} JELLY!`;
