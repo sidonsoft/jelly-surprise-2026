@@ -13,7 +13,7 @@ const PLAYER_SPEED = 200;
 
 interface GameState {
   player: { x: number; y: number };
-  orbs: { x: number; y: number; element: Element }[];
+  orbs: { x: number; y: number; element: Element; id: number }[];
   evolutionPoints: number;
   collectedEssence: Partial<Record<Element, number>>;
   discoveredCreatures: { name: string; element: Element }[];
@@ -139,7 +139,7 @@ export class JellyGame extends Phaser.Scene {
     } while (this.distance(x, y, gameState.player.x, gameState.player.y) < 100);
 
     const orbId = orbIdCounter++;
-    gameState.orbs.push({ x, y, element });
+    gameState.orbs.push({ x, y, element, id: orbId });
     this.drawOrb(orbId, { x, y, element });
   }
 
@@ -215,28 +215,18 @@ export class JellyGame extends Phaser.Scene {
   checkCollisions() {
     for (let i = gameState.orbs.length - 1; i >= 0; i--) {
       const orb = gameState.orbs[i];
-      const orbId = this.findOrbId(orb);
-      if (orbId !== null && this.distance(gameState.player.x, gameState.player.y, orb.x, orb.y) < (PLAYER_SIZE + ORB_SIZE)) {
-        this.collectOrb(orb, i, orbId);
+      if (this.distance(gameState.player.x, gameState.player.y, orb.x, orb.y) < (PLAYER_SIZE + ORB_SIZE)) {
+        this.collectOrb(orb, i);
+        break;
       }
     }
   }
 
-  findOrbId(orb: { x: number; y: number; element: Element }): number | null {
-    for (const [id, gfx] of orbGraphics.entries()) {
-      const pos = gfx.getData('position');
-      if (pos && pos.x === orb.x && pos.y === orb.y) {
-        return id;
-      }
-    }
-    return null;
-  }
-
-  collectOrb(orb: { x: number; y: number; element: Element }, index: number, orbId: number) {
+  collectOrb(orb: { x: number; y: number; element: Element; id: number }, index: number) {
     gameState.evolutionPoints++;
     gameState.collectedEssence[orb.element] = (gameState.collectedEssence[orb.element] || 0) + 1;
 
-    this.removeOrbGraphics(orbId);
+    this.removeOrbGraphics(orb.id);
 
     gameState.orbs.splice(index, 1);
     this.spawnOrb();
