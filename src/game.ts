@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { ELEMENTS, ELEMENT_COLORS, ELEMENT_EMOJI, CREATURES } from './constants';
 import type { Element } from './constants';
+import { saveGame, loadGame as loadGameFromStorage } from './systems/SaveSystem';
+import { showSaveIndicator, showLoadToast } from './ui/SaveIndicator';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
@@ -37,6 +39,8 @@ let wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phase
 let orbGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
 let orbEmojis: Map<number, Phaser.GameObjects.Text> = new Map();
 let orbIdCounter = 0;
+let autoSaveTimer: Phaser.Time.TimerEvent | null = null;
+const AUTO_SAVE_INTERVAL = 30000;
 
 export class JellyGame extends Phaser.Scene {
   constructor() {
@@ -50,6 +54,15 @@ export class JellyGame extends Phaser.Scene {
     this.setupControls();
     this.setupUI();
     this.loadGame();
+    this.startAutoSave();
+  }
+
+  startAutoSave() {
+    autoSaveTimer = this.time.addEvent({
+      delay: AUTO_SAVE_INTERVAL,
+      callback: () => this.saveGame(),
+      loop: true
+    });
   }
 
   createGrid() {
@@ -237,27 +250,43 @@ export class JellyGame extends Phaser.Scene {
 
   triggerEvolution() {
     gameState.isEvolving = true;
-    const randomCreature = CREATURES[Math.floor(Math.random() * CREATURES.length)];
-    gameState.currentCreature = randomCreature;
 
-    if (!gameState.discoveredCreatures.find((c) => c.name === randomCreature.name)) {
-      gameState.discoveredCreatures.push(randomCreature);
+    const weights = ELEMENTS.map((el) => gameState.collectedEssence[el] || 0);
+    const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+
+    let randomRoll = Math.random() * totalWeight;
+    let selectedCreature = CREATURES[0];
+    for (let i = 0; i < CREATURES.length; i++) {
+      randomRoll -= weights[i];
+      if (randomRoll <= 0) {
+        selectedCreature = CREATURES[i];
+        break;
+      }
     }
 
-    const color = ELEMENT_COLORS[randomCreature.element];
+    gameState.currentCreature = selectedCreature;
+
+    if (!gameState.discoveredCreatures.find((c) => c.name === selectedCreature.name)) {
+      gameState.discoveredCreatures.push(selectedCreature);
+      this.saveGame();
+    }
+
+    const color = ELEMENT_COLORS[selectedCreature.element];
     this.drawGlowCircle(playerGraphics, gameState.player.x, gameState.player.y, PLAYER_SIZE, color, true);
-    playerEmoji.setText(ELEMENT_EMOJI[randomCreature.element]);
+    playerEmoji.setText(ELEMENT_EMOJI[selectedCreature.element]);
 
     const modalOverlay = document.getElementById('modal-overlay')!;
     const modalEmoji = document.getElementById('modal-emoji')!;
     const modalTitle = document.getElementById('modal-title')!;
     const modalSubtitle = document.getElementById('modal-subtitle')!;
+    const modalAbility = document.getElementById('modal-ability')!;
 
-    modalEmoji.textContent = ELEMENT_EMOJI[randomCreature.element];
-    modalTitle.textContent = `You became a ${randomCreature.element.toUpperCase()} JELLY!`;
+    modalEmoji.textContent = ELEMENT_EMOJI[selectedCreature.element];
+    modalTitle.textContent = `You became a ${selectedCreature.element.toUpperCase()} JELLY!`;
     modalSubtitle.textContent = gameState.discoveredCreatures.length === CREATURES.length
       ? 'You discovered all creatures!'
       : 'A new creature has awakened';
+    modalAbility.textContent = selectedCreature.ability;
     modalTitle.style.textShadow = `0 0 20px #${color.toString(16).padStart(6, '0')}`;
 
     modalOverlay.classList.add('show');
@@ -289,26 +318,25 @@ export class JellyGame extends Phaser.Scene {
   }
 
   saveGame() {
-    const saveData = {
+    showSaveIndicator();
+    saveGame({
       player: gameState.player,
       evolutionPoints: gameState.evolutionPoints,
       collectedEssence: gameState.collectedEssence,
       discoveredCreatures: gameState.discoveredCreatures,
       currentCreature: gameState.currentCreature
-    };
-    localStorage.setItem('jellySurpriseSave', JSON.stringify(saveData));
+    });
   }
 
   loadGame() {
-    const saved = localStorage.getItem('jellySurpriseSave');
+    const saved = loadGameFromStorage();
     if (saved) {
       try {
-        const data = JSON.parse(saved);
-        gameState.player = data.player || { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
-        gameState.evolutionPoints = data.evolutionPoints || 0;
-        gameState.collectedEssence = data.collectedEssence || {};
-        gameState.discoveredCreatures = data.discoveredCreatures || [];
-        gameState.currentCreature = data.currentCreature || null;
+        gameState.player = saved.player || { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+        gameState.evolutionPoints = saved.evolutionPoints || 0;
+        gameState.collectedEssence = saved.collectedEssence || {};
+        gameState.discoveredCreatures = saved.discoveredCreatures || [];
+        gameState.currentCreature = saved.currentCreature || null;
 
         if (gameState.currentCreature) {
           const color = ELEMENT_COLORS[gameState.currentCreature.element];
@@ -317,6 +345,7 @@ export class JellyGame extends Phaser.Scene {
         }
 
         this.updateUI();
+        showLoadToast();
       } catch (e) {
         console.error('Failed to load save:', e);
       }

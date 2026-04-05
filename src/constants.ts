@@ -17,10 +17,10 @@ export const ELEMENT_EMOJI: Record<Element, string> = {
   Mystic: '✨'
 };
 
-export const CREATURES: { name: string; element: Element }[] = [
-  { name: 'Ember Jelly', element: 'Fire' },
-  { name: 'Aqua Jelly', element: 'Water' },
-  { name: 'Breeze Jelly', element: 'Sky' },
-  { name: 'Leaf Jelly', element: 'Forest' },
-  { name: 'Star Jelly', element: 'Mystic' }
+export const CREATURES: { name: string; element: Element; ability: string }[] = [
+  { name: 'Ember Jelly', element: 'Fire', ability: 'Blazing Trail — leaves fire behind as you move' },
+  { name: 'Aqua Jelly', element: 'Water', ability: 'Bubble Shield — absorbs one hit before bursting' },
+  { name: 'Breeze Jelly', element: 'Sky', ability: 'Gust Dash — double speed burst' },
+  { name: 'Leaf Jelly', element: 'Forest', ability: 'Vine Net — slows enemies on contact' },
+  { name: 'Star Jelly', element: 'Mystic', ability: 'Lucky Star — bonus essence drops' }
 ];
