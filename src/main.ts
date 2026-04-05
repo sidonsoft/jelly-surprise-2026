@@ -1,9 +1,7 @@
 import Phaser from 'phaser';
-
-const WORLD_WIDTH = 1600;
-const WORLD_HEIGHT = 1200;
-const ESSENCE_COUNT = 15;
-const ESSENCE_COLLECT_THRESHOLD = 20;
+import { EVOLUTION_THRESHOLD, ESSENCE_COUNT, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_SPEED, ESSENCE_COLLECT_RADIUS, ESSENCE_SPAWN_MARGIN, ESSENCE_RADIUS } from './config';
+import { creatureManager } from './systems/CreatureManager';
+import type { EvolutionResult } from './types';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -14,7 +12,7 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 0 },
+      gravity: { x: 0, y: 0 },
       debug: false,
     },
   },
@@ -33,68 +31,88 @@ let essenceCounter: Phaser.GameObjects.Text;
 let evolutionBar: Phaser.GameObjects.Graphics;
 let collectedCount: number;
 let cam: Phaser.Cameras.Scene2D.Camera;
+let evolutionText: Phaser.GameObjects.Text;
+let lastEvolutionResult: EvolutionResult | null = null;
 
 function preload() {
 }
 
-function create() {
-  const scene = this;
+function create(this: Phaser.Scene) {
   collectedCount = 0;
   essences = [];
 
-  cam = scene.cameras.main;
+  cam = this.cameras.main;
   cam.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
   cam.startFollow(player, true, 0.1, 0.1);
 
-  scene.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-  player = scene.add.arc(400, 300, 25, 0, 360, false, 0x00ff88);
-  player.setFillStyle(0x00ff88, 1);
-  scene.physics.add.existing(player, false);
+  const initialCreature = creatureManager.getCurrentCreature();
+  player = this.add.arc(400, 300, initialCreature.radius, 0, 360, false, initialCreature.color);
+  player.setFillStyle(initialCreature.color, 1);
+  this.physics.add.existing(player, false);
   (player.body as Phaser.Physics.Arcade.Body).setCollideWorldBounds(true);
 
-  const graphics = scene.add.graphics();
+  const graphics = this.add.graphics();
   graphics.fillStyle(0x000000, 0.3);
   graphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
   for (let i = 0; i < ESSENCE_COUNT; i++) {
-    spawnEssence(scene);
+    spawnEssence(this);
   }
 
-  const uiContainer = scene.add.container(0, 0);
+  const uiContainer = this.add.container(0, 0);
   uiContainer.setScrollFactor(0);
   uiContainer.setDepth(100);
 
-  essenceCounter = scene.add.text(10, 10, 'Essences: 0', {
+  essenceCounter = this.add.text(10, 10, 'Essences: 0', {
     fontSize: '20px',
     color: '#ffffff',
     fontFamily: 'Arial, sans-serif',
   });
   uiContainer.add(essenceCounter);
 
-  evolutionBar = scene.add.graphics();
+  evolutionBar = this.add.graphics();
   uiContainer.add(evolutionBar);
 
-  const evoLabel = scene.add.text(10, 40, 'Evolution', {
+  const evoLabel = this.add.text(10, 40, 'Evolution', {
     fontSize: '14px',
     color: '#aaaaaa',
     fontFamily: 'Arial, sans-serif',
   });
   uiContainer.add(evoLabel);
 
+  evolutionText = this.add.text(10, 85, '', {
+    fontSize: '16px',
+    color: '#ffff00',
+    fontFamily: 'Arial, sans-serif',
+  });
+  uiContainer.add(evolutionText);
+
+  creatureManager.on('evolution', (result: EvolutionResult) => {
+    lastEvolutionResult = result;
+    updatePlayerVisual();
+    evolutionText.setText(`Evolved into ${result.newCreature.name}!`);
+    setTimeout(() => {
+      if (evolutionText) {
+        evolutionText.setText('');
+      }
+    }, 3000);
+  });
+
   drawEvolutionBar(0);
 
-  cursors = scene.input.keyboard!.createCursorKeys();
+  cursors = this.input.keyboard!.createCursorKeys();
   wasd = {
-    W: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-    A: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-    S: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-    D: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    W: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+    A: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+    S: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+    D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
   };
 }
 
-function update() {
-  const speed = 200;
+function update(this: Phaser.Scene) {
+  const speed = PLAYER_SPEED;
   const body = player.body as Phaser.Physics.Arcade.Body;
   body.setVelocity(0);
 
@@ -113,10 +131,16 @@ function update() {
   checkEssenceCollisions(this);
 }
 
+function updatePlayerVisual() {
+  const creature = creatureManager.getCurrentCreature();
+  player.setRadius(creature.radius);
+  player.setFillStyle(creature.color, 1);
+}
+
 function spawnEssence(scene: Phaser.Scene) {
-  const x = Phaser.Math.Between(50, WORLD_WIDTH - 50);
-  const y = Phaser.Math.Between(50, WORLD_HEIGHT - 50);
-  const essence = scene.add.circle(x, y, 12, 0xffdd00, 0.8);
+  const x = Phaser.Math.Between(ESSENCE_SPAWN_MARGIN, WORLD_WIDTH - ESSENCE_SPAWN_MARGIN);
+  const y = Phaser.Math.Between(ESSENCE_SPAWN_MARGIN, WORLD_HEIGHT - ESSENCE_SPAWN_MARGIN);
+  const essence = scene.add.circle(x, y, ESSENCE_RADIUS, 0xffdd00, 0.8);
   essence.setStrokeStyle(2, 0xffaa00);
   essences.push(essence);
 
@@ -138,13 +162,19 @@ function checkEssenceCollisions(scene: Phaser.Scene) {
   for (let i = essences.length - 1; i >= 0; i--) {
     const e = essences[i];
     const dist = Phaser.Math.Distance.Between(px, py, e.x, e.y);
-    if (dist < 35) {
+    if (dist < ESSENCE_COLLECT_RADIUS) {
       e.destroy();
       essences.splice(i, 1);
       collectedCount++;
       essenceCounter.setText(`Essences: ${collectedCount}`);
 
-      drawEvolutionBar(collectedCount / ESSENCE_COLLECT_THRESHOLD);
+      const result = creatureManager.addEssence(1);
+      const progress = creatureManager.getState().totalEssence / EVOLUTION_THRESHOLD;
+      drawEvolutionBar(progress);
+
+      if (result.wasEvolution) {
+        updatePlayerVisual();
+      }
 
       if (essences.length < ESSENCE_COUNT) {
         spawnEssence(scene);
