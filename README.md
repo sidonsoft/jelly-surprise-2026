@@ -88,3 +88,4 @@ Live URL: https://sidonsoft.github.io/jelly-surprise-2026/
 - [ ] Locked/unlocked creature tracking
 - [ ] Save/load system (localStorage)
 - [ ] Progress persistence
+# CDN refresh trigger
