@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ELEMENTS, ELEMENT_COLORS, ELEMENT_EMOJI, CREATURES } from './constants';
 import type { Element } from './constants';
+import { audioManager } from './audio';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
@@ -10,7 +11,7 @@ const ORB_COUNT = 8;
 const EVOLUTION_MAX = 10;
 const PLAYER_SPEED = 200;
 
-type MenuState = 'main-menu' | 'playing' | 'paused' | 'settings' | 'catalog';
+type MenuState = 'loading' | 'main-menu' | 'playing' | 'paused' | 'settings' | 'catalog';
 
 interface GameState {
   player: { x: number; y: number };
@@ -32,16 +33,32 @@ let gameState: GameState = {
   isEvolving: false
 };
 
-let menuState: MenuState = 'main-menu';
+let menuState: MenuState = 'loading';
 let previousMenuState: MenuState = 'main-menu';
 
 let playerGraphics: Phaser.GameObjects.Graphics;
 let playerEmoji: Phaser.GameObjects.Text;
+let playerWobbleOffset = 0;
 let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 let wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
 let orbGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
 let orbEmojis: Map<number, Phaser.GameObjects.Text> = new Map();
 let orbIdCounter = 0;
+let particleEmitters: Map<number, Phaser.GameObjects.Particles.ParticleEmitter> = new Map();
+let isMuted = false;
+
+const TIPS = [
+  'Collect elemental orbs to evolve your jelly!',
+  'Each creature has a unique element and appearance.',
+  'Press ESC to pause during gameplay.',
+  'Discover all 5 creatures to complete your collection!',
+  'Your progress is automatically saved.',
+  'Try to find your favorite creature combination!'
+];
+
+function getRandomTip(): string {
+  return TIPS[Math.floor(Math.random() * TIPS.length)];
+}
 
 function showScreen(screenId: string) {
   document.querySelectorAll('.menu-screen').forEach(el => el.classList.remove('active'));
@@ -72,8 +89,11 @@ function updateCatalogGrid() {
   });
 }
 
-function setupMenuEventListeners() {
-  document.getElementById('btn-start')?.addEventListener('click', () => {
+function setupMenuEventListeners(game: JellyGame) {
+  document.getElementById('btn-start')?.addEventListener('click', async () => {
+    audioManager.playClick();
+    await audioManager.resume();
+    audioManager.playBGM();
     menuState = 'playing';
     hideAllScreens();
     if (gameState.currentCreature === null) {
@@ -82,19 +102,23 @@ function setupMenuEventListeners() {
   });
 
   document.getElementById('btn-catalog')?.addEventListener('click', () => {
-    previousMenuState = menuState;
+    audioManager.playMenuOpen();
+    previousMenuState = menuState === 'playing' ? 'playing' : 'main-menu';
     menuState = 'catalog';
     updateCatalogGrid();
     showScreen('catalog-screen');
   });
 
   document.getElementById('btn-settings')?.addEventListener('click', () => {
-    previousMenuState = menuState;
+    audioManager.playMenuOpen();
+    previousMenuState = menuState === 'playing' ? 'playing' : 'main-menu';
     menuState = 'settings';
     showScreen('settings-screen');
+    updateMuteButton();
   });
 
   document.getElementById('btn-settings-back')?.addEventListener('click', () => {
+    audioManager.playClick();
     if (previousMenuState === 'main-menu') {
       menuState = 'main-menu';
       showScreen('main-menu');
@@ -105,6 +129,7 @@ function setupMenuEventListeners() {
   });
 
   document.getElementById('btn-catalog-back')?.addEventListener('click', () => {
+    audioManager.playClick();
     if (previousMenuState === 'main-menu') {
       menuState = 'main-menu';
       showScreen('main-menu');
@@ -115,35 +140,44 @@ function setupMenuEventListeners() {
   });
 
   document.getElementById('btn-resume')?.addEventListener('click', () => {
+    audioManager.playClick();
     menuState = 'playing';
     hideAllScreens();
   });
 
   document.getElementById('btn-pause-catalog')?.addEventListener('click', () => {
+    audioManager.playMenuOpen();
     menuState = 'catalog';
     updateCatalogGrid();
     showScreen('catalog-screen');
   });
 
   document.getElementById('btn-pause-settings')?.addEventListener('click', () => {
+    audioManager.playMenuOpen();
     menuState = 'settings';
     showScreen('settings-screen');
+    updateMuteButton();
   });
 
   document.getElementById('btn-pause-main')?.addEventListener('click', () => {
+    audioManager.playClick();
+    audioManager.stopBGM();
     menuState = 'main-menu';
     showScreen('main-menu');
   });
 
   document.getElementById('btn-reset')?.addEventListener('click', () => {
+    audioManager.playClick();
     document.getElementById('confirm-modal')?.classList.add('show');
   });
 
   document.getElementById('btn-confirm-cancel')?.addEventListener('click', () => {
+    audioManager.playClick();
     document.getElementById('confirm-modal')?.classList.remove('show');
   });
 
   document.getElementById('btn-confirm-reset')?.addEventListener('click', () => {
+    audioManager.playEvolve();
     localStorage.removeItem('jellySurpriseSave');
     gameState = {
       player: { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
@@ -157,23 +191,65 @@ function setupMenuEventListeners() {
     document.getElementById('confirm-modal')?.classList.remove('show');
     menuState = 'main-menu';
     showScreen('main-menu');
+    game.resetGame();
+  });
+
+  const muteBtn = document.getElementById('btn-mute');
+  muteBtn?.addEventListener('click', () => {
+    isMuted = audioManager.toggleMute();
+    updateMuteButton();
+    audioManager.playClick();
   });
 }
 
+function updateMuteButton() {
+  const muteBtn = document.getElementById('btn-mute');
+  if (muteBtn) {
+    muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
+  }
+}
+
+function createParticleTexture(scene: Phaser.Scene) {
+  const graphics = scene.make.graphics({ x: 0, y: 0 });
+  graphics.fillStyle(0xffffff, 1);
+  graphics.fillCircle(4, 4, 4);
+  graphics.generateTexture('particle', 8, 8);
+  graphics.destroy();
+}
+
 export class JellyGame extends Phaser.Scene {
+  private evolutionCameraShake: Phaser.Cameras.Scene2D.Camera | null = null;
+
   constructor() {
     super({ key: 'JellyGame' });
   }
 
-  create() {
+  async create() {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     if (canvas) {
       canvas.width = CANVAS_WIDTH;
       canvas.height = CANVAS_HEIGHT;
     }
 
-    setupMenuEventListeners();
-    showScreen('main-menu');
+    await audioManager.init();
+    
+    createParticleTexture(this);
+    
+    setupMenuEventListeners(this);
+    
+    this.evolutionCameraShake = this.cameras.main;
+
+    setTimeout(() => {
+      const tipElement = document.getElementById('loading-tip');
+      if (tipElement) {
+        tipElement.textContent = getRandomTip();
+      }
+    }, 100);
+
+    setTimeout(() => {
+      menuState = 'main-menu';
+      showScreen('main-menu');
+    }, 1500);
 
     this.createGrid();
     this.createPlayer();
@@ -232,10 +308,12 @@ export class JellyGame extends Phaser.Scene {
 
     this.input.keyboard!.on('keydown-ESC', () => {
       if (menuState === 'playing') {
+        audioManager.playMenuOpen();
         menuState = 'paused';
         previousMenuState = 'playing';
         showScreen('pause-screen');
       } else if (menuState === 'paused') {
+        audioManager.playClick();
         menuState = 'playing';
         hideAllScreens();
       }
@@ -246,6 +324,7 @@ export class JellyGame extends Phaser.Scene {
     const modalOverlay = document.getElementById('modal-overlay')!;
     const modalButton = document.getElementById('modal-button')!;
     modalButton.addEventListener('click', () => {
+      audioManager.playClick();
       modalOverlay.classList.remove('show');
       gameState.isEvolving = false;
     });
@@ -292,6 +371,30 @@ export class JellyGame extends Phaser.Scene {
       emoji.destroy();
       orbEmojis.delete(orbId);
     }
+    const emitter = particleEmitters.get(orbId);
+    if (emitter) {
+      emitter.stop();
+      emitter.destroy();
+      particleEmitters.delete(orbId);
+    }
+  }
+
+  spawnCollectionParticles(x: number, y: number, color: number) {
+    const emitter = this.add.particles(x, y, 'particle', {
+      speed: { min: 50, max: 150 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: color,
+      lifespan: 400,
+      quantity: 8,
+      blendMode: 'ADD',
+      emitting: false
+    });
+    emitter.explode();
+    particleEmitters.set(-Date.now(), emitter);
+    setTimeout(() => {
+      emitter.destroy();
+    }, 500);
   }
 
   distance(x1: number, y1: number, x2: number, y2: number): number {
@@ -333,7 +436,8 @@ export class JellyGame extends Phaser.Scene {
       CANVAS_HEIGHT - PLAYER_SIZE
     );
 
-    const wobble = Math.sin(this.time.now / 200) * 3;
+    playerWobbleOffset += delta * 3;
+    const wobble = Math.sin(playerWobbleOffset) * 3;
     playerGraphics.clear();
     const color = gameState.currentCreature ? ELEMENT_COLORS[gameState.currentCreature.element] : 0xe94560;
     this.drawGlowCircle(playerGraphics, gameState.player.x, gameState.player.y + wobble, PLAYER_SIZE, color, true);
@@ -364,6 +468,9 @@ export class JellyGame extends Phaser.Scene {
     gameState.evolutionPoints++;
     gameState.collectedEssence[orb.element] = (gameState.collectedEssence[orb.element] || 0) + 1;
 
+    this.spawnCollectionParticles(orb.x, orb.y, ELEMENT_COLORS[orb.element]);
+    audioManager.playCollect();
+
     this.removeOrbGraphics(orbId);
 
     gameState.orbs.splice(index, 1);
@@ -386,9 +493,25 @@ export class JellyGame extends Phaser.Scene {
       gameState.discoveredCreatures.push(randomCreature);
     }
 
+    audioManager.playEvolve();
+
+    if (this.evolutionCameraShake) {
+      this.evolutionCameraShake.shake(300, 0.02);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        if (this.evolutionCameraShake) {
+          this.evolutionCameraShake.shake(100, 0.01);
+        }
+      }, i * 100);
+    }
+
     const color = ELEMENT_COLORS[randomCreature.element];
     this.drawGlowCircle(playerGraphics, gameState.player.x, gameState.player.y, PLAYER_SIZE, color, true);
     playerEmoji.setText(ELEMENT_EMOJI[randomCreature.element]);
+
+    this.spawnCollectionParticles(gameState.player.x, gameState.player.y, color);
 
     const modalOverlay = document.getElementById('modal-overlay')!;
     const modalEmoji = document.getElementById('modal-emoji')!;
@@ -463,5 +586,20 @@ export class JellyGame extends Phaser.Scene {
         console.error('Failed to load save:', e);
       }
     }
+  }
+
+  resetGame() {
+    orbGraphics.forEach(gfx => gfx.destroy());
+    orbEmojis.forEach(emoji => emoji.destroy());
+    orbGraphics.clear();
+    orbEmojis.clear();
+    particleEmitters.forEach(emitter => emitter.destroy());
+    particleEmitters.clear();
+    orbIdCounter = 0;
+    
+    this.createGrid();
+    this.createPlayer();
+    this.spawnOrbs();
+    this.updateUI();
   }
 }
