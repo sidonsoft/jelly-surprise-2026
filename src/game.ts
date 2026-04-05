@@ -10,6 +10,8 @@ const ORB_COUNT = 8;
 const EVOLUTION_MAX = 10;
 const PLAYER_SPEED = 200;
 
+type MenuState = 'main-menu' | 'playing' | 'paused' | 'settings' | 'catalog';
+
 interface GameState {
   player: { x: number; y: number };
   orbs: { x: number; y: number; element: Element }[];
@@ -30,6 +32,9 @@ let gameState: GameState = {
   isEvolving: false
 };
 
+let menuState: MenuState = 'main-menu';
+let previousMenuState: MenuState = 'main-menu';
+
 let playerGraphics: Phaser.GameObjects.Graphics;
 let playerEmoji: Phaser.GameObjects.Text;
 let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -38,12 +43,138 @@ let orbGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
 let orbEmojis: Map<number, Phaser.GameObjects.Text> = new Map();
 let orbIdCounter = 0;
 
+function showScreen(screenId: string) {
+  document.querySelectorAll('.menu-screen').forEach(el => el.classList.remove('active'));
+  const screen = document.getElementById(screenId);
+  if (screen) {
+    screen.classList.add('active');
+  }
+}
+
+function hideAllScreens() {
+  document.querySelectorAll('.menu-screen').forEach(el => el.classList.remove('active'));
+}
+
+function updateCatalogGrid() {
+  const grid = document.getElementById('catalog-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  CREATURES.forEach(creature => {
+    const discovered = gameState.discoveredCreatures.some(c => c.name === creature.name);
+    const item = document.createElement('div');
+    item.className = `catalog-item${discovered ? '' : ' undiscovered'}`;
+    item.innerHTML = `
+      <span class="catalog-emoji">${ELEMENT_EMOJI[creature.element]}</span>
+      <span class="catalog-name">${discovered ? creature.name : '???'}</span>
+    `;
+    grid.appendChild(item);
+  });
+}
+
+function setupMenuEventListeners() {
+  document.getElementById('btn-start')?.addEventListener('click', () => {
+    menuState = 'playing';
+    hideAllScreens();
+    if (gameState.currentCreature === null) {
+      gameState.currentCreature = { name: 'Baby Jelly', element: 'Water' };
+    }
+  });
+
+  document.getElementById('btn-catalog')?.addEventListener('click', () => {
+    previousMenuState = menuState;
+    menuState = 'catalog';
+    updateCatalogGrid();
+    showScreen('catalog-screen');
+  });
+
+  document.getElementById('btn-settings')?.addEventListener('click', () => {
+    previousMenuState = menuState;
+    menuState = 'settings';
+    showScreen('settings-screen');
+  });
+
+  document.getElementById('btn-settings-back')?.addEventListener('click', () => {
+    if (previousMenuState === 'main-menu') {
+      menuState = 'main-menu';
+      showScreen('main-menu');
+    } else {
+      menuState = 'paused';
+      showScreen('pause-screen');
+    }
+  });
+
+  document.getElementById('btn-catalog-back')?.addEventListener('click', () => {
+    if (previousMenuState === 'main-menu') {
+      menuState = 'main-menu';
+      showScreen('main-menu');
+    } else {
+      menuState = 'paused';
+      showScreen('pause-screen');
+    }
+  });
+
+  document.getElementById('btn-resume')?.addEventListener('click', () => {
+    menuState = 'playing';
+    hideAllScreens();
+  });
+
+  document.getElementById('btn-pause-catalog')?.addEventListener('click', () => {
+    menuState = 'catalog';
+    updateCatalogGrid();
+    showScreen('catalog-screen');
+  });
+
+  document.getElementById('btn-pause-settings')?.addEventListener('click', () => {
+    menuState = 'settings';
+    showScreen('settings-screen');
+  });
+
+  document.getElementById('btn-pause-main')?.addEventListener('click', () => {
+    menuState = 'main-menu';
+    showScreen('main-menu');
+  });
+
+  document.getElementById('btn-reset')?.addEventListener('click', () => {
+    document.getElementById('confirm-modal')?.classList.add('show');
+  });
+
+  document.getElementById('btn-confirm-cancel')?.addEventListener('click', () => {
+    document.getElementById('confirm-modal')?.classList.remove('show');
+  });
+
+  document.getElementById('btn-confirm-reset')?.addEventListener('click', () => {
+    localStorage.removeItem('jellySurpriseSave');
+    gameState = {
+      player: { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
+      orbs: [],
+      evolutionPoints: 0,
+      collectedEssence: {},
+      discoveredCreatures: [],
+      currentCreature: null,
+      isEvolving: false
+    };
+    document.getElementById('confirm-modal')?.classList.remove('show');
+    menuState = 'main-menu';
+    showScreen('main-menu');
+  });
+}
+
 export class JellyGame extends Phaser.Scene {
   constructor() {
     super({ key: 'JellyGame' });
   }
 
   create() {
+    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
+    }
+
+    setupMenuEventListeners();
+    showScreen('main-menu');
+
     this.createGrid();
     this.createPlayer();
     this.spawnOrbs();
@@ -98,6 +229,17 @@ export class JellyGame extends Phaser.Scene {
       S: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     };
+
+    this.input.keyboard!.on('keydown-ESC', () => {
+      if (menuState === 'playing') {
+        menuState = 'paused';
+        previousMenuState = 'playing';
+        showScreen('pause-screen');
+      } else if (menuState === 'paused') {
+        menuState = 'playing';
+        hideAllScreens();
+      }
+    });
   }
 
   setupUI() {
@@ -157,7 +299,7 @@ export class JellyGame extends Phaser.Scene {
   }
 
   update() {
-    if (gameState.isEvolving) return;
+    if (menuState !== 'playing' || gameState.isEvolving) return;
 
     this.handleMovement();
     this.checkCollisions();

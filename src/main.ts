@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { JellyGame } from './game';
 
 const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
+  type: Phaser.CANVAS,
   width: 800,
   height: 500,
-  parent: 'game-container',
+  canvas: document.getElementById('game-canvas') as HTMLCanvasElement,
   backgroundColor: '#1a1a2e',
   scene: [JellyGame],
   physics: {
