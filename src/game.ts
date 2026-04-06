@@ -290,17 +290,16 @@ export class JellyGame extends Phaser.Scene {
   updateUI() {
     const creatureEmoji = document.getElementById('creature-emoji')!;
     const creatureName = document.getElementById('creature-name')!;
-    const essenceCounter = document.getElementById('essence-counter')!;
+    const evolutionText = document.getElementById('evolution-text')!;
     const creatureCount = document.getElementById('creature-count')!;
     const evolutionBarFill = document.getElementById('evolution-bar-fill') as HTMLDivElement;
-    const evolutionText = document.getElementById('evolution-text')!;
 
     const currentEmoji = gameState.currentCreature ? ELEMENT_EMOJI[gameState.currentCreature.element] : '🫧';
     const currentName = gameState.currentCreature ? gameState.currentCreature.name : 'Baby Jelly';
 
     creatureEmoji.textContent = currentEmoji;
     creatureName.textContent = currentName;
-    essenceCounter.textContent = `Essence: ${gameState.evolutionPoints}`;
+    evolutionText.textContent = `${gameState.evolutionPoints} / ${EVOLUTION_MAX} Essence`;
     creatureCount.textContent = `Found: ${gameState.discoveredCreatures.length}/${CREATURES.length}`;
 
     const fillPercent = (gameState.evolutionPoints / EVOLUTION_MAX) * 100;
