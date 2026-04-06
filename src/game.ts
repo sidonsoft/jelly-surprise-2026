@@ -42,6 +42,15 @@ let orbIdCounter = 0;
 let autoSaveTimer: Phaser.Time.TimerEvent | null = null;
 const AUTO_SAVE_INTERVAL = 30000;
 
+let catalogOverlay: HTMLElement;
+let catalogGrid: HTMLElement;
+let catalogProgress: HTMLElement;
+let catalogDetailOverlay: HTMLElement;
+let catalogDetailEmoji: HTMLElement;
+let catalogDetailName: HTMLElement;
+let catalogDetailElement: HTMLElement;
+let catalogDetailAbility: HTMLElement;
+
 export class JellyGame extends Phaser.Scene {
   constructor() {
     super({ key: 'JellyGame' });
@@ -138,6 +147,87 @@ export class JellyGame extends Phaser.Scene {
     confirmNo.addEventListener('click', () => {
       confirmDialog.classList.remove('show');
     });
+
+    catalogOverlay = document.getElementById('catalog-overlay')!;
+    catalogGrid = document.getElementById('catalog-grid')!;
+    catalogProgress = document.getElementById('catalog-progress')!;
+    catalogDetailOverlay = document.getElementById('catalog-detail-overlay')!;
+    catalogDetailEmoji = document.getElementById('catalog-detail-emoji')!;
+    catalogDetailName = document.getElementById('catalog-detail-name')!;
+    catalogDetailElement = document.getElementById('catalog-detail-element')!;
+    catalogDetailAbility = document.getElementById('catalog-detail-ability')!;
+
+    const catalogBtn = document.getElementById('catalog-btn')!;
+    const catalogClose = document.getElementById('catalog-close')!;
+    const catalogDetailClose = document.getElementById('catalog-detail-close')!;
+
+    catalogBtn.addEventListener('click', () => this.openCatalog());
+    catalogClose.addEventListener('click', () => catalogOverlay.classList.remove('show'));
+    catalogDetailClose.addEventListener('click', () => catalogDetailOverlay.classList.remove('show'));
+  }
+
+  openCatalog() {
+    this.renderCatalog();
+    catalogOverlay.classList.add('show');
+  }
+
+  renderCatalog() {
+    catalogGrid.innerHTML = '';
+    const discovered = gameState.discoveredCreatures;
+
+    catalogProgress.textContent = `${discovered.length}/${CREATURES.length} Discovered`;
+
+    CREATURES.forEach((creature) => {
+      const isDiscovered = discovered.some((c) => c.name === creature.name);
+      const card = document.createElement('div');
+      card.className = `catalog-card ${isDiscovered ? 'discovered' : 'undiscovered'} ${!isDiscovered ? 'locked' : ''}`;
+
+      if (isDiscovered) {
+        const emoji = document.createElement('div');
+        emoji.className = 'catalog-card-emoji';
+        emoji.textContent = ELEMENT_EMOJI[creature.element];
+
+        const name = document.createElement('div');
+        name.className = 'catalog-card-name';
+        name.textContent = creature.name;
+
+        const element = document.createElement('div');
+        element.className = 'catalog-card-element';
+        element.textContent = creature.element;
+
+        card.appendChild(emoji);
+        card.appendChild(name);
+        card.appendChild(element);
+
+        card.addEventListener('click', () => this.showCreatureDetail(creature));
+      } else {
+        const silhouette = document.createElement('div');
+        silhouette.className = 'catalog-card-silhouette';
+        silhouette.textContent = '?';
+
+        const name = document.createElement('div');
+        name.className = 'catalog-card-name';
+        name.textContent = '???';
+
+        const element = document.createElement('div');
+        element.className = 'catalog-card-element';
+        element.textContent = 'Unknown';
+
+        card.appendChild(silhouette);
+        card.appendChild(name);
+        card.appendChild(element);
+      }
+
+      catalogGrid.appendChild(card);
+    });
+  }
+
+  showCreatureDetail(creature: { name: string; element: Element; ability: string }) {
+    catalogDetailEmoji.textContent = ELEMENT_EMOJI[creature.element];
+    catalogDetailName.textContent = creature.name;
+    catalogDetailElement.textContent = creature.element + ' Type';
+    catalogDetailAbility.textContent = creature.ability;
+    catalogDetailOverlay.classList.add('show');
   }
 
   resetGame() {
