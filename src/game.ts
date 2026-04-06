@@ -132,11 +132,22 @@ export class JellyGame extends Phaser.Scene {
 
   spawnOrb() {
     const element = ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
-    let x: number, y: number;
-    let attempts = 0; while (attempts < 50) {
+    let x = Math.random() * (CANVAS_WIDTH - ORB_SIZE * 4) + ORB_SIZE * 2;
+    let y = Math.random() * (CANVAS_HEIGHT - ORB_SIZE * 4) + ORB_SIZE * 2;
+    let attempts = 0;
+    const maxAttempts = 50;
+    while (attempts < maxAttempts) {
       x = Math.random() * (CANVAS_WIDTH - ORB_SIZE * 4) + ORB_SIZE * 2;
       y = Math.random() * (CANVAS_HEIGHT - ORB_SIZE * 4) + ORB_SIZE * 2;
-    if (this.distance(x, y, gameState.player.x, gameState.player.y) >= 100) { attempts++; continue; } break; }
+      if (this.distance(x, y, gameState.player.x, gameState.player.y) >= 100) {
+        break;
+      }
+      attempts++;
+    }
+    if (attempts >= maxAttempts) {
+      x = Math.random() * (CANVAS_WIDTH - ORB_SIZE * 2) + ORB_SIZE;
+      y = Math.random() * (CANVAS_HEIGHT - ORB_SIZE * 2) + ORB_SIZE;
+    }
 
     const orbId = orbIdCounter++;
     gameState.orbs.push({ x, y, element, id: orbId });
